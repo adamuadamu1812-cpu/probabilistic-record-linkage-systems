@@ -1,0 +1,6 @@
+{
+  "name": "Fellegi-Sunter Record Linkage Workbench",
+  "description": "Probabilistic record linkage and duplicate detection system across independent databases using blocking, string similarity comparators, Expectation-Maximization weight estimation, and Match, Possible Match, and Non-Match classification.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

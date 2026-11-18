@@ -1,0 +1,202 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll(['uid', 'displayName', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'displayName', 'roleLabel', 'createdAt', 'updatedAt'])
+        && data.uid is string
+        && data.uid == request.auth.uid
+        && data.uid == userId
+        && data.uid.size() >= 1
+        && data.uid.size() <= 128
+        && data.uid.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.displayName is string
+        && data.displayName.size() >= 1
+        && data.displayName.size() <= 80
+        && (!('roleLabel' in data) || (data.roleLabel is string && data.roleLabel.size() >= 1 && data.roleLabel.size() <= 60))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidUserPrivateInfo(data, userId) {
+      return data.keys().hasAll(['uid', 'email', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'email', 'createdAt', 'updatedAt'])
+        && data.uid is string
+        && data.uid == request.auth.uid
+        && data.uid == userId
+        && data.uid.size() >= 1
+        && data.uid.size() <= 128
+        && data.uid.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.email is string
+        && data.email.size() >= 3
+        && data.email.size() <= 254
+        && data.email.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$')
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidSavedWorkspace(data, userId) {
+      return data.keys().hasAll([
+          'ownerId', 'name', 'presetId', 'dbAName', 'dbBName',
+          'lowerThreshold', 'upperThreshold', 'priorMatch',
+          'enforceOneToOne', 'matchCount', 'clericalCount',
+          'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'name', 'presetId', 'dbAName', 'dbBName',
+          'lowerThreshold', 'upperThreshold', 'priorMatch',
+          'enforceOneToOne', 'matchCount', 'clericalCount',
+          'createdAt', 'updatedAt'
+        ])
+        && data.ownerId is string
+        && data.ownerId == request.auth.uid
+        && data.ownerId == userId
+        && data.ownerId.size() >= 1
+        && data.ownerId.size() <= 128
+        && data.ownerId.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.name is string
+        && data.name.size() >= 1
+        && data.name.size() <= 100
+        && data.presetId is string
+        && data.presetId.size() >= 1
+        && data.presetId.size() <= 64
+        && data.presetId.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.dbAName is string
+        && data.dbAName.size() >= 1
+        && data.dbAName.size() <= 100
+        && data.dbBName is string
+        && data.dbBName.size() >= 1
+        && data.dbBName.size() <= 100
+        && (data.lowerThreshold is int || data.lowerThreshold is float)
+        && (data.upperThreshold is int || data.upperThreshold is float)
+        && data.lowerThreshold >= -30
+        && data.upperThreshold <= 50
+        && data.lowerThreshold <= data.upperThreshold
+        && (data.priorMatch is int || data.priorMatch is float)
+        && data.priorMatch >= 0
+        && data.priorMatch <= 1
+        && data.enforceOneToOne is bool
+        && (data.matchCount is int || data.matchCount is float)
+        && data.matchCount >= 0
+        && (data.clericalCount is int || data.clericalCount is float)
+        && data.clericalCount >= 0
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if false;
+      allow create: if isVerifiedUser()
+        && isOwner(userId)
+        && isValidId(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser()
+        && isOwner(userId)
+        && isValidId(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'roleLabel', 'updatedAt'])
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time;
+      allow delete: if false;
+
+      match /private/{docId} {
+        allow get: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(docId)
+          && docId == 'info'
+          && exists(/databases/$(database)/documents/users/$(userId));
+        allow list: if false;
+        allow create: if isVerifiedUser()
+          && isOwner(userId)
+          && isValidId(userId)
+          && isValidId(docId)
+          && docId == 'info'
+          && isValidUserPrivateInfo(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && getAfter(/databases/$(database)/documents/users/$(userId)).data.uid == request.auth.uid;
+        allow update: if isVerifiedUser()
+          && isOwner(userId)
+          && isValidId(userId)
+          && isValidId(docId)
+          && docId == 'info'
+          && isValidUserPrivateInfo(incoming(), userId)
+          && incoming().diff(existing()).affectedKeys().hasOnly(['email', 'updatedAt'])
+          && incoming().uid == existing().uid
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && get(/databases/$(database)/documents/users/$(userId)).data.uid == request.auth.uid;
+        allow delete: if false;
+      }
+
+      match /workspaces/{workspaceId} {
+        allow get: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(workspaceId)
+          && get(/databases/$(database)/documents/users/$(userId)).data.uid == request.auth.uid;
+        allow list: if isOwner(userId)
+          && resource.data.ownerId == request.auth.uid;
+        allow create: if isVerifiedUser()
+          && isOwner(userId)
+          && isValidId(userId)
+          && isValidId(workspaceId)
+          && isValidSavedWorkspace(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && get(/databases/$(database)/documents/users/$(userId)).data.uid == request.auth.uid;
+        allow update: if isVerifiedUser()
+          && isOwner(userId)
+          && isValidId(userId)
+          && isValidId(workspaceId)
+          && isValidSavedWorkspace(incoming(), userId)
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'name', 'presetId', 'dbAName', 'dbBName',
+            'lowerThreshold', 'upperThreshold', 'priorMatch',
+            'enforceOneToOne', 'matchCount', 'clericalCount', 'updatedAt'
+          ])
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && get(/databases/$(database)/documents/users/$(userId)).data.uid == request.auth.uid;
+        allow delete: if isVerifiedUser()
+          && isOwner(userId)
+          && isValidId(userId)
+          && isValidId(workspaceId)
+          && get(/databases/$(database)/documents/users/$(userId)).data.uid == request.auth.uid;
+      }
+    }
+  }
+}

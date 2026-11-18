@@ -1,0 +1,175 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Public-safe user profile summary for an authenticated workbench analyst.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Authentication UID of the user.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Display name shown in the workbench account menu.",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "roleLabel": {
+          "type": "string",
+          "description": "Optional analyst specialty or team label.",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the profile was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the profile was last updated."
+        }
+      },
+      "required": ["uid", "displayName", "createdAt", "updatedAt"]
+    },
+    "UserPrivateInfo": {
+      "title": "UserPrivateInfo",
+      "description": "Isolated PII document storing the authenticated user's email address.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Authentication UID matching the parent user document.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Verified email address of the user.",
+          "minLength": 3,
+          "maxLength": 254
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the private record was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the private record was last updated."
+        }
+      },
+      "required": ["uid", "email", "createdAt", "updatedAt"]
+    },
+    "SavedWorkspace": {
+      "title": "SavedWorkspace",
+      "description": "Saved Fellegi-Sunter model calibration thresholds and dataset metadata owned by a user.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "description": "User-supplied snapshot title.",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "presetId": {
+          "type": "string",
+          "description": "Active dataset preset or source identifier.",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "dbAName": {
+          "type": "string",
+          "description": "Name of Source A.",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "dbBName": {
+          "type": "string",
+          "description": "Name of Source B.",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "lowerThreshold": {
+          "type": "number",
+          "description": "Lower clerical threshold T_lambda."
+        },
+        "upperThreshold": {
+          "type": "number",
+          "description": "Upper match threshold T_mu."
+        },
+        "priorMatch": {
+          "type": "number",
+          "description": "Prior or EM-calibrated match prevalence pi_M."
+        },
+        "enforceOneToOne": {
+          "type": "boolean",
+          "description": "Whether 1-to-1 greedy assignment is enabled."
+        },
+        "matchCount": {
+          "type": "number",
+          "description": "Count of final linked matches at save time."
+        },
+        "clericalCount": {
+          "type": "number",
+          "description": "Count of clerical pairs remaining at save time."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the snapshot was saved."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the snapshot was last modified."
+        }
+      },
+      "required": [
+        "ownerId",
+        "name",
+        "presetId",
+        "dbAName",
+        "dbBName",
+        "lowerThreshold",
+        "upperThreshold",
+        "priorMatch",
+        "enforceOneToOne",
+        "matchCount",
+        "clericalCount",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Public-safe user profile documents keyed by Firebase Auth UID."
+    },
+    "/users/{userId}/private/{docId}": {
+      "schema": { "$ref": "#/entities/UserPrivateInfo" },
+      "description": "Isolated PII subcollection storing private account info (docId = 'info')."
+    },
+    "/users/{userId}/workspaces/{workspaceId}": {
+      "schema": { "$ref": "#/entities/SavedWorkspace" },
+      "description": "User-owned saved model threshold and linkage parameter snapshots."
+    }
+  }
+}
